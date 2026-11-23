@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uji Prediksi Berita</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            background-color: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+        h2 { text-align: center; color: #333; margin-top: 0; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+        textarea { height: 120px; resize: vertical; }
+        button {
+            background-color: #0d9488;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        button:hover { background-color: #0f766e; }
+        button:disabled { background-color: #aaa; cursor: not-allowed; }
+        #result { margin-top: 20px; padding: 15px; border-radius: 4px; display: none; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .badge {
+            background-color: #0d9488;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 14px;
+            margin-right: 5px;
+            display: inline-block;
+        }
+        .prob-list { list-style-type: none; padding: 0; margin-top: 10px; font-size: 14px; }
+        .prob-list li {
+            padding: 6px 0;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Berita Classifier</h2>
+    <div class="form-group">
+        <label for="judul">Judul Berita</label>
+        <input type="text" id="judul" placeholder="Contoh: Rupiah Melemah..." required>
+    </div>
+    <div class="form-group">
+        <label for="content">Isi Berita</label>
+        <textarea id="content" placeholder="Masukkan isi lengkap teks berita di sini..." required></textarea>
+    </div>
+    <button id="submitBtn" onclick="prediksiBerita()">Prediksi Kategori</button>
+
+    <div id="result"></div>
+</div>
+
+<script>
+    async function prediksiBerita() {
+        const judul = document.getElementById('judul').value.trim();
+        const content = document.getElementById('content').value.trim();
+        const resultDiv = document.getElementById('result');
+        const submitBtn = document.getElementById('submitBtn');
+
+        if (!judul || !content) {
+            alert('Silakan isi Judul dan Content terlebih dahulu.');
+            return;
+        }
+
+        // Tampilan Loading
+        submitBtn.innerText = 'Memproses ke API...';
+        submitBtn.disabled = true;
+        resultDiv.style.display = 'none';
+        resultDiv.className = '';
+
+        try {
+            // Hit API FastAPI
+            const response = await fetch('http://127.0.0.1:8000/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ judul: judul, content: content })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP Error: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            // Membangun tampilan Kategori
+            let kategoriHtml = '';
+            data.kategori_prediksi.forEach(kat => {
+                kategoriHtml += `<span class="badge">${kat}</span>`;
+            });
+
+            // Membangun tampilan Detail Probabilitas
+            let probHtml = '<ul class="prob-list">';
+            for (const [kategori, persentase] of Object.entries(data.probabilitas_detail)) {
+                probHtml += `<li><span>${kategori}</span> <strong>${persentase}</strong></li>`;
+            }
+            probHtml += '</ul>';
+
+            // Merender hasil ke layar
+            resultDiv.innerHTML = `
+                <h3 style="margin-top: 0; color: #155724;">Hasil Analisis</h3>
+                <p><strong>Kategori:</strong> ${kategoriHtml}</p>
+                <p style="margin-bottom: 0;"><strong>Akurasi AI:</strong></p>
+                ${probHtml}
+            `;
+            resultDiv.className = 'success';
+            resultDiv.style.display = 'block';
+
+        } catch (error) {
+            resultDiv.innerHTML = `<strong>Error:</strong> Gagal terhubung ke API.<br><br>
+                                   Pastikan FastAPI berjalan di <code>127.0.0.1:8000</code> dan konfigurasi CORS sudah diizinkan.<br>
+                                   <small>${error.message}</small>`;
+            resultDiv.className = 'error';
+            resultDiv.style.display = 'block';
+        } finally {
+            submitBtn.innerText = 'Prediksi Kategori';
+            submitBtn.disabled = false;
+        }
+    }
+</script>
+
+</body>
+</html>
